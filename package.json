@@ -46,8 +46,5 @@
     "eslint-plugin-prettier": "^4.2.1",
     "eslint-plugin-react": "^7.31.8",
     "prettier": "^2.7.1"
-  },
-  "engines": {
-    "node": "14.x"
   }
 }
