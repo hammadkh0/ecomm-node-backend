@@ -7,7 +7,7 @@ const HttpError = require('../utils/httpError');
 const sendEmail = require('../utils/email');
 const { promisify } = require('util');
 const { createUserWithToken } = require('../utils/createUserWithToken');
-const { saveUserInDB } = require('../utils/dbUser');
+const { saveUserInDB } = require('../utils/tpAuthUser');
 
 exports.signup = catchAsync(async (req, res, next) => {
   // runs the pre middleware before saving.
@@ -94,7 +94,7 @@ exports.forgotPassword = catchAsync(async (req, res, next) => {
 
   // 3) Send it to user email
   //const resetUrl = `${req.protocol}://${req.get('host')}/ecomm/users/resetPassword/${resetToken}`;
-  const resetUrl = `http://localhost:8000/reset-password/${resetToken}`;
+  const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
   const message = `Forgot your password! Submit a request with your password and confirmPassword to the url:${resetUrl}. If you didn't forget, then ignore this email`;
 
   try {
@@ -158,41 +158,38 @@ exports.updatePassword = catchAsync(async (req, res, next) => {
   createUserWithToken(user, 200, res);
 });
 
-exports.googleAuth = catchAsync(async function (req, res, next) {
-  let existingUser;
+exports.thirdPartyAuth = catchAsync(async function (req, res, next) {
   const profile = req.body.user.credential;
-  try {
-    existingUser = await User.findOne({ email: profile.email });
-  } catch (error) {
-    return next(new HttpError('Something went wrong. Could not authenticate with google', 500));
-  }
+  const authType = req.body.authType;
+
+  // first is facebook email and second is google email
+  const email = profile.email || profile.emails[0]?.value;
+
+  const existingUser = await User.findOne({ email: email });
 
   if (!existingUser) {
     // create a new user if there is none signed in before with this google email.
-    const newUser = await saveUserInDB(profile);
-    console.log(newUser);
-    existingUser = newUser;
-
-    createUserWithToken(existingUser, 200, res);
+    const newUser = await saveUserInDB(profile, authType);
+    createUserWithToken(newUser, 200, res);
 
     //
   } else {
-    let isAlreadyGoogleUser;
+    let isAlreadyAuthUser;
 
     if (existingUser.providers.length) {
       existingUser.providers.map((providerObj) => {
-        // check if user has already signed with google. If yes then the app will not add the google record again in the db.
-        if (providerObj.provider === 'google') {
-          isAlreadyGoogleUser = true;
+        // check if user has already signed with google/fb. If yes then the app will not add the google/fb record again in the db.
+        if (providerObj.provider === authType) {
+          isAlreadyAuthUser = true;
         }
       });
     }
-
-    // if there is no signed in with google before. So we will add the provider = google and the google userId to this user.
-    if (!isAlreadyGoogleUser) {
+    // if there is no signed in with google/fb before. So we will add the provider = google or fb and the google/fb userId to this user.
+    if (!isAlreadyAuthUser) {
       existingUser.providers.push({
-        provider: 'goole',
-        id: profile.sub,
+        provider: authType,
+        // googleId: profile.sub || faebookId: profile.userId,
+        id: profile.sub || profile.userId,
       });
       try {
         await existingUser.save({ validateBeforeSave: false });
@@ -204,7 +201,6 @@ exports.googleAuth = catchAsync(async function (req, res, next) {
     }
     createUserWithToken(existingUser, 200, res);
   }
-  //res.redirect('http://localhost:8000/dashboard');
 });
 
 // -------------------- MIDDLEWARE ----------------- //

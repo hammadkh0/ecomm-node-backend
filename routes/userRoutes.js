@@ -21,7 +21,7 @@ const {
   protect,
   updatePassword,
   restrictTo,
-  googleAuth,
+  thirdPartyAuth,
 } = require('../controllers/authController');
 const fileUpload = require('../middleware/upload-image');
 
@@ -41,7 +41,7 @@ router.post('/login', login);
 router.get('/logout', protect, logout);
 router.post('/forgotPassword', forgotPassword);
 router.patch('/resetPassword/:token', resetPassword);
-router.post('/auth/google', googleAuth);
+router.post('/auth/third-party', thirdPartyAuth);
 
 // only access these routes after logging in because of protect middleware
 router.use(protect);
